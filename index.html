@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Utility Pro - Premium Data Tools</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Fira+Code&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s; }
+        .dark { background-color: #0f172a; color: #f1f5f9; }
+        .dark .bg-white { background-color: #1e293b; color: #f1f5f9; }
+        .dark .border { border-color: #334155; }
+        .dark .bg-slate-50 { background-color: #0f172a; }
+        .active-tab { border-bottom: 3px solid #3b82f6; color: #3b82f6; font-weight: 600; }
+        .drag-over { border: 2px dashed #3b82f6 !important; background-color: #eff6ff !important; }
+        .pro-badge { background: linear-gradient(to right, #f59e0b, #d97706); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+
+    <header class="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm sticky top-0 z-50">
+        <div class="flex items-center gap-8">
+            <div class="flex items-center gap-2">
+                <div class="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">J</div>
+                <h1 class="text-xl font-bold tracking-tight">JSON<span class="text-blue-600">Utility</span></h1>
+            </div>
+            <nav class="hidden md:flex gap-6 text-sm font-medium text-slate-500">
+                <a href="#" class="hover:text-blue-600">JSON to CSV</a>
+                <a href="#" class="hover:text-blue-600">CSV to JSON</a>
+                <a href="#" onclick="showModal('proModal')" class="text-amber-600 font-bold">Upgrade to PRO</a>
+            </nav>
+        </div>
+        <div class="flex items-center gap-4">
+            <button onclick="toggleDarkMode()" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
+                <svg id="theme-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+            </button>
+            <button onclick="showModal('proModal')" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-md font-semibold text-sm transition shadow-sm">Log in</button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
+        <div class="w-full md:w-1/2 flex flex-col border-r bg-white" id="dropZone">
+            <div class="px-6 py-3 bg-slate-50 border-b flex justify-between items-center">
+                <span class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Input JSON</span>
+                <div class="flex gap-4">
+                    <label class="text-xs text-blue-600 font-semibold cursor-pointer hover:underline">
+                        Upload File <input type="file" id="fileInput" class="hidden" accept=".json">
+                    </label>
+                    <button onclick="prettify()" class="text-xs text-blue-600 font-semibold hover:underline">Prettify</button>
+                </div>
+            </div>
+            
+            <div class="relative flex-1 flex flex-col">
+                <textarea id="jsonInput" class="flex-1 p-6 text-sm font-mono outline-none resize-none bg-transparent leading-relaxed" placeholder='Paste JSON here or drag and drop a .json file...'></textarea>
+                
+                <div id="dragOverlay" class="hidden absolute inset-0 bg-blue-50/90 border-4 border-dashed border-blue-400 flex flex-col items-center justify-center text-blue-600 z-10 pointer-events-none">
+                    <svg class="w-16 h-16 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                    <span class="font-bold text-lg">Drop JSON file to import</span>
+                </div>
+            </div>
+            
+            <div id="error" class="hidden p-4 bg-red-50 text-red-600 text-xs border-t font-medium"></div>
+        </div>
+
+        <div class="w-full md:w-1/2 flex flex-col bg-slate-50">
+            <div class="flex border-b bg-white">
+                <button onclick="setMode('table')" id="tab-table" class="px-6 py-4 text-sm active-tab">Table View</button>
+                <button onclick="setMode('typescript')" id="tab-typescript" class="px-6 py-4 text-sm text-slate-400">TypeScript</button>
+                <button onclick="handleProTab()" class="px-6 py-4 text-sm text-slate-400 flex items-center gap-2">
+                    SQL Export <span class="bg-amber-100 text-amber-700 text-[9px] px-1.5 py-0.5 rounded font-bold">PRO</span>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-auto p-8" id="outputContainer">
+                <div id="empty-msg" class="h-full flex flex-col items-center justify-center text-slate-300 italic text-center">
+                    <svg class="w-12 h-12 mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-width="2"></path></svg>
+                    Enter JSON or drop a file to see the results...
+                </div>
+                
+                <div id="results-area" class="hidden space-y-8 animate-in fade-in duration-500">
+                    <div id="table-wrapper" class="overflow-x-auto rounded-xl border bg-white shadow-sm"></div>
+                    <pre id="code-output" class="hidden bg-slate-900 text-blue-200 p-8 rounded-xl text-sm leading-relaxed"></pre>
+
+                    <div class="flex flex-wrap items-center gap-4 pt-6 border-t border-slate-200">
+                        <div class="flex flex-col items-center">
+                            <button onclick="downloadCSV()" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-md flex items-center gap-3 font-bold transition shadow-lg active:scale-95">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                DOWNLOAD CSV
+                            </button>
+                            <span class="text-[10px] text-slate-400 mt-2 font-medium">result.csv</span>
+                        </div>
+
+                        <button onclick="downloadExcel()" class="border border-slate-300 bg-white text-slate-600 px-5 py-3 rounded-md flex items-center gap-2 hover:bg-slate-50 transition font-medium">
+                            <svg class="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6z"></path></svg>
+                            or Excel File (XLSX)
+                        </button>
+
+                        <button onclick="copyToClipboard()" class="border border-slate-300 bg-white text-slate-600 px-5 py-3 rounded-md flex items-center gap-2 hover:bg-slate-50 transition font-medium">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1" stroke-width="2" stroke-linecap="round"></path></svg>
+                            Copy to Clipboard
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-white border-t px-12 py-10">
+        <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-blue-600 font-medium">
+            <div class="space-y-3">
+                <a href="#" class="block hover:underline">JSON to CSV</a>
+                <a href="#" class="block hover:underline">CSV to JSON</a>
+                <a href="#" class="block hover:underline font-bold">Desktop App</a>
+                <a href="#" class="block hover:underline text-slate-400">JSON Formatter</a>
+            </div>
+            <div class="space-y-3">
+                <a href="#" onclick="showModal('proModal')" class="block hover:underline font-bold">Upgrade to PRO</a>
+                <a href="#" class="block hover:underline">API Access</a>
+                <a href="#" class="block hover:underline">JSON Editor</a>
+            </div>
+            <div class="space-y-3">
+                <a href="#" class="block hover:underline">What is JSON?</a>
+                <a href="#" class="block hover:underline">Blog</a>
+                <a href="#" class="block hover:underline">About Us</a>
+            </div>
+        </div>
+    </footer>
+
+    <div id="proModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl text-center space-y-6">
+            <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+                <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+            </div>
+            <h2 class="text-2xl font-bold">Unlock SQL Export</h2>
+            <p class="text-slate-500">Perfect for developers. Instantly generate SQL schemas and Insert statements from any JSON file.</p>
+            <button class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">Upgrade for $5/mo</button>
+            <button onclick="closeModal('proModal')" class="text-slate-400 text-sm hover:underline">Maybe later</button>
+        </div>
+    </div>
+
+<script>
+    const jsonInput = document.getElementById('jsonInput');
+    const dropZone = document.getElementById('dropZone');
+    const dragOverlay = document.getElementById('dragOverlay');
+    const fileInput = document.getElementById('fileInput');
+    const tableWrapper = document.getElementById('table-wrapper');
+    const codeOutput = document.getElementById('code-output');
+    const resultsArea = document.getElementById('results-area');
+    const emptyMsg = document.getElementById('empty-msg');
+    const errorDiv = document.getElementById('error');
+
+    let currentData = null;
+    let mode = 'table';
+
+    // File Upload Handlers
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+    
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dragOverlay.classList.remove('hidden');
+    });
+
+    dropZone.addEventListener('dragleave', () => dragOverlay.classList.add('hidden'));
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dragOverlay.classList.add('hidden');
+        handleFiles(e.dataTransfer.files);
+    });
+
+    function handleFiles(files) {
+        if (!files.length) return;
+        const file = files[0];
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            jsonInput.value = e.target.result;
+            processData(e.target.result);
+        };
+        reader.readAsText(file);
+    }
+
+    jsonInput.addEventListener('input', () => processData(jsonInput.value));
+
+    function processData(val) {
+        const trimmed = val.trim();
+        if(!trimmed) { reset(); return; }
+        try {
+            const parsed = JSON.parse(trimmed);
+            currentData = Array.isArray(parsed) ? parsed : [parsed];
+            errorDiv.classList.add('hidden');
+            render();
+        } catch (e) {
+            errorDiv.innerText = "Error: " + e.message;
+            errorDiv.classList.remove('hidden');
+        }
+    }
+
+    function render() {
+        emptyMsg.classList.add('hidden');
+        resultsArea.classList.remove('hidden');
+
+        if(mode === 'table') {
+            tableWrapper.classList.remove('hidden');
+            codeOutput.classList.add('hidden');
+            const keys = Object.keys(currentData[0]);
+            let html = `<table class="w-full text-left text-sm"><thead class="bg-slate-50 border-b"><tr>`;
+            keys.forEach(k => html += `<th class="px-4 py-3 font-bold text-slate-500 uppercase text-[10px] tracking-wider">${k}</th>`);
+            html += `</tr></thead><tbody class="divide-y divide-slate-100">`;
+            currentData.slice(0, 15).forEach(row => {
+                html += `<tr>` + keys.map(k => `<td class="px-4 py-3 text-slate-600 whitespace-nowrap overflow-hidden max-w-[200px] text-ellipsis">${row[k] ?? ''}</td>`).join('') + `</tr>`;
+            });
+            tableWrapper.innerHTML = html + `</tbody></table>`;
+        } else {
+            tableWrapper.classList.add('hidden');
+            codeOutput.classList.remove('hidden');
+            let ts = 'export interface MyData {\n' + Object.keys(currentData[0]).map(k => `  ${k}: ${typeof currentData[0][k]};`).join('\n') + '\n}';
+            codeOutput.textContent = ts;
+        }
+    }
+
+    // Logic Functions
+    function setMode(m) {
+        mode = m;
+        document.getElementById('tab-table').className = m === 'table' ? 'px-6 py-4 text-sm active-tab' : 'px-6 py-4 text-sm text-slate-400';
+        document.getElementById('tab-typescript').className = m === 'typescript' ? 'px-6 py-4 text-sm active-tab' : 'px-6 py-4 text-sm text-slate-400';
+        if(currentData) render();
+    }
+
+    function handleProTab() { showModal('proModal'); }
+    function showModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    function downloadCSV() {
+        const keys = Object.keys(currentData[0]);
+        const csv = [keys.join(','), ...currentData.map(row => keys.map(k => `"${(row[k]||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'result.csv'; a.click();
+    }
+
+    function downloadExcel() {
+        const ws = XLSX.utils.json_to_sheet(currentData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Data");
+        XLSX.writeFile(wb, "result.xlsx");
+    }
+
+    function copyToClipboard() {
+        const text = mode === 'table' ? JSON.stringify(currentData, null, 2) : codeOutput.textContent;
+        navigator.clipboard.writeText(text);
+        alert('Copied to Clipboard!');
+    }
+
+    function toggleDarkMode() { document.body.classList.toggle('dark'); }
+    function prettify() { try { jsonInput.value = JSON.stringify(JSON.parse(jsonInput.value), null, 4); } catch(e) {} }
+    function reset() { resultsArea.classList.add('hidden'); emptyMsg.classList.remove('hidden'); currentData = null; }
+</script>
+</body>
+</html>
